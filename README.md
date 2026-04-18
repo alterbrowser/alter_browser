@@ -128,7 +128,7 @@ pytest tests/ -v
 
 ## 版本
 
-- **v0.2.0-dev** — Archetype + IP 自适应 + 多模式引擎
+- **v0.2.0** — Archetype + IP 自适应 + 多模式引擎（首个 PyPI 发布）
 - **v0.1.0** — MVP（Profile + SwitchBuilder + Launcher + CLI + 测试）
 
 ---
