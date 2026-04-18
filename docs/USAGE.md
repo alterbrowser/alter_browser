@@ -29,10 +29,14 @@
 ```python
 from alterbrowser import AlterBrowser
 
+# 什么都不传 — seed 自动用"纳秒时间戳 XOR 熵"生成，每次不同
+AlterBrowser().launch("https://example.com")
+
+# 想可复现？显式传 seed
 AlterBrowser(seed=12345).launch("https://example.com")
 ```
 
-等价于手写一串 `--fingerprint-*` 开关调用 `subprocess.Popen`。`seed` 是所有派生的种子。
+`seed` 是所有确定性派生（字体混合 / variant 选择 / deviceID）的根种子，v0.3.1 起完全可选。
 
 ---
 

@@ -12,10 +12,23 @@ from alterbrowser.errors import ProfileValidationError, ProfileLoadError
 
 def test_default_profile():
     p = Profile()
-    assert p.seed == 0
+    # v0.3.1+: seed 默认不传时自动生成 (时间戳 + 熵)，为正整数
+    assert isinstance(p.seed, int) and p.seed > 0
     assert p.brand == "Chrome"
     assert p.platform == "Win32"
     assert p.fonts_mode == FontMode.DEFAULT
+
+
+def test_auto_seed_is_unique():
+    """连续调用 Profile() 应该得到不同 seed"""
+    seeds = {Profile().seed for _ in range(50)}
+    assert len(seeds) >= 45  # 允许极少量碰撞
+
+
+def test_explicit_seed_honored():
+    """显式传 seed 不应被自动生成覆盖"""
+    assert Profile(seed=42).seed == 42
+    assert Profile(seed=0).seed == 0   # 0 是合法的显式值
 
 
 def test_profile_with_seed():

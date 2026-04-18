@@ -45,7 +45,7 @@ class Profile:
     """
 
     # ===== 核心 =====
-    seed: int = 0
+    seed: Optional[int] = None   # 留空自动生成（基于时间戳 + 熵）
     name: str = ""
     user_data_dir: Optional[str] = None
 
@@ -146,6 +146,10 @@ class Profile:
     # ============================================
 
     def __post_init__(self):
+        # seed 可选：缺省时用时间戳 + 熵自动生成
+        if self.seed is None:
+            from .utils import random_seed
+            self.seed = random_seed()
         # 先展开 shorthand 简写字段（gpu / cpu / os / resolution / city）
         self._expand_shorthand()
         # 规范化所有枚举字段（接受字符串输入）

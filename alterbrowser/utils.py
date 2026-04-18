@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import time
 from typing import Any, List, Sequence
 
 
@@ -51,8 +52,15 @@ def derive_float(seed: int, key: str, lo: float, hi: float) -> float:
 
 
 def random_seed() -> int:
-    """生成一个随机 32 位 seed"""
-    return random.randint(1, 2**31 - 1)
+    """
+    生成一个随机 32 位正整数 seed。
+
+    用当前纳秒时间戳 XOR 系统随机熵，确保即使同一毫秒内连续调用也不会重复。
+    """
+    t_ns = time.time_ns()
+    r = random.randint(0, 2**31 - 1)
+    # 混合时间 + 熵，取低 31 位；+1 确保非零
+    return ((t_ns ^ r) & 0x7FFFFFFF) | 1
 
 
 def safe_filename(name: str) -> str:

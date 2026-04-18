@@ -57,12 +57,11 @@ export ALTERBROWSER_PROFILES_DIR="/path/to/profiles"
 ```python
 from alterbrowser import AlterBrowser
 
-# 1) 最简：只给一个 seed
-AlterBrowser(seed=12345).launch("https://example.com")
+# 1) 最简：什么都不填，seed 自动用时间戳+熵生成
+AlterBrowser().launch("https://example.com")
 
 # 2) 🔥 shorthand：一行指定 GPU / CPU / OS / 分辨率 / 城市（v0.3+）
 AlterBrowser(
-    seed=12345,
     gpu="RTX 5090",        # 自动展开成 gpu_vendor/gpu_renderer
     cpu="i9-14900K",       # 自动展开成 hardware_concurrency / device_memory
     os="win11",            # 自动展开成 platform / platform_version
@@ -70,12 +69,15 @@ AlterBrowser(
     city="Shanghai",       # 自动展开成 timezone / geolocation / language
 ).launch("https://example.com")
 
-# 3) 从 Device Archetype 派生（市场权重随机挑一个真实机型）
-sb = AlterBrowser.from_archetype("dell_latitude_e6430_2012", seed=12345)
+# 3) 想要可复现？显式传 seed
+AlterBrowser(seed=12345, city="Shanghai").launch()
+
+# 4) 从 Device Archetype 派生（市场权重随机挑一个真实机型）
+sb = AlterBrowser.from_archetype("dell_latitude_e6430_2012")
 sb.adapt_to_ip()           # 按出口 IP 自动对齐时区/地理/语言/字体
 sb.launch("https://example.com")
 
-# 4) 持久化
+# 5) 持久化
 sb.save("profile_001.json")
 AlterBrowser.load("profile_001.json").launch()
 ```
@@ -91,6 +93,8 @@ AlterBrowser.load("profile_001.json").launch()
 | `city` | `"Shanghai"` / `"NYC"` / `"Tokyo"` / `"Hong Kong"` / `"London"` / 30+ 大城市 |
 
 不在预设表的显卡名会按**品牌关键词**识别（nvidia/radeon/intel/apple），其他字段 fallback 为 no-op。用户显式设置的底层字段始终优先于 shorthand。
+
+**关于 `seed`**：v0.3.1 起完全可选，不传则用"纳秒时间戳 XOR 系统熵"自动生成。seed 只决定 ① `fingerprint_mode=UNIQUE` 下传给 Chrome 的指纹种子 ② 字体混合/variant 选择等确定性派生 ③ `user-data-dir` 默认命名。想可复现时再显式传。
 
 更多场景示例见 [`docs/USAGE.md`](docs/USAGE.md)，所有 API 细节见 [`docs/API.md`](docs/API.md)。
 
@@ -146,6 +150,7 @@ pytest tests/ -v
 
 ## 版本
 
+- **v0.3.1** — `seed` 改为完全可选；不传则用时间戳+熵自动生成
 - **v0.3.0** — Shorthand 简写字段（GPU / CPU / OS / Resolution / City 一行搞定）
 - **v0.2.1** — Archetype_library 内嵌打包（`from_archetype` 可直接用）
 - **v0.2.0** — Archetype + IP 自适应 + 多模式引擎（首个 PyPI 发布）
