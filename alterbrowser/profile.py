@@ -29,6 +29,11 @@ DEFAULT_CHROME_BINARY = os.environ.get(
                 "build", "src", "out", "Default", "chrome.exe"),
 )
 
+DEFAULT_PROFILES_BASE = os.environ.get(
+    "ALTERBROWSER_PROFILES_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profiles"),
+)
+
 
 @dataclass
 class Profile:
@@ -127,11 +132,22 @@ class Profile:
     note: str = ""
     tags: List[str] = field(default_factory=list)
 
+    # ===== Shorthand 快捷字段（post_init 里展开到真实字段）=====
+    # 这些字段本身不传给 Chrome，只是便于用户一行表达意图。
+    # 例：Profile(gpu="RTX 5090", cpu="i9-14900K", os="win11", resolution="4K", city="Shanghai")
+    gpu: Optional[str] = None           # "RTX 5090" / "M2 Pro" / 任意字符串
+    cpu: Optional[str] = None           # "i9-14900K" / "Ryzen 9 7950X" / "M2"
+    os: Optional[str] = None            # "win11" / "macos 14" / "linux"
+    resolution: Optional[str] = None    # "1920x1080" / "4K" / "qhd"
+    city: Optional[str] = None          # "Shanghai" / "New York" / "Tokyo"
+
     # ============================================
     # 校验 & 序列化
     # ============================================
 
     def __post_init__(self):
+        # 先展开 shorthand 简写字段（gpu / cpu / os / resolution / city）
+        self._expand_shorthand()
         # 规范化所有枚举字段（接受字符串输入）
         self.fonts_mode = FontMode.parse(self.fonts_mode)
         self.fingerprint_mode = FingerprintMode.parse(self.fingerprint_mode)
@@ -181,6 +197,32 @@ class Profile:
             lat, lon = self.geolocation[0], self.geolocation[1]
             if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
                 raise ProfileValidationError("geolocation out of WGS84 range")
+
+    # ------- shorthand 展开 -------
+
+    def _expand_shorthand(self) -> None:
+        """
+        把 shorthand 字段（gpu/cpu/os/resolution/city）展开成底层真实字段。
+        规则：字段当前值等于 dataclass 默认值时，就视作"未显式设置"，可以被 shorthand 覆盖。
+        """
+        from .presets import expand_shorthand
+        expanded = expand_shorthand(
+            gpu=self.gpu,
+            cpu=self.cpu,
+            os=self.os,
+            resolution=self.resolution,
+            city=self.city,
+        )
+        if not expanded:
+            return
+
+        defaults = {f.name: f.default for f in fields(self)}
+        for k, v in expanded.items():
+            current = getattr(self, k, None)
+            default = defaults.get(k)
+            # 当前值等于默认值 → 视作未设置；否则尊重用户显式配置
+            if current == default or current is None or current == "":
+                setattr(self, k, v)
 
     # ------- 序列化 -------
 
@@ -251,19 +293,15 @@ class Profile:
 
     # ------- 自动派生 -------
 
-    _DEFAULT_PROFILES_BASE = os.environ.get(
-        "ALTERBROWSER_PROFILES_DIR",
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "profiles"),
-    )
-
     def auto_user_data_dir(self, base: str = None) -> str:
         """若未设置 user_data_dir，自动生成一个路径"""
+        import os as _os
         if self.user_data_dir:
             return self.user_data_dir
         if base is None:
-            base = self._DEFAULT_PROFILES_BASE
+            base = DEFAULT_PROFILES_BASE
         nm = safe_filename(self.name) if self.name else f"seed_{self.seed}"
-        return os.path.join(base, nm)
+        return _os.path.join(base, nm)
 
 
 # ============================================================

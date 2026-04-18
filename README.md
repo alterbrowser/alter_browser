@@ -60,11 +60,17 @@ from alterbrowser import AlterBrowser
 # 1) 最简：只给一个 seed
 AlterBrowser(seed=12345).launch("https://example.com")
 
-# 2) 指定平台 + 字体模式
-sb = AlterBrowser(seed=12345, platform="MacIntel", fonts_mode="mix")
-sb.launch()
+# 2) 🔥 shorthand：一行指定 GPU / CPU / OS / 分辨率 / 城市（v0.3+）
+AlterBrowser(
+    seed=12345,
+    gpu="RTX 5090",        # 自动展开成 gpu_vendor/gpu_renderer
+    cpu="i9-14900K",       # 自动展开成 hardware_concurrency / device_memory
+    os="win11",            # 自动展开成 platform / platform_version
+    resolution="4K",       # 自动展开成 screen_width/height（也支持 "1920x1080"）
+    city="Shanghai",       # 自动展开成 timezone / geolocation / language
+).launch("https://example.com")
 
-# 3) 从 Device Archetype 派生（v0.2 推荐）
+# 3) 从 Device Archetype 派生（市场权重随机挑一个真实机型）
 sb = AlterBrowser.from_archetype("dell_latitude_e6430_2012", seed=12345)
 sb.adapt_to_ip()           # 按出口 IP 自动对齐时区/地理/语言/字体
 sb.launch("https://example.com")
@@ -73,6 +79,18 @@ sb.launch("https://example.com")
 sb.save("profile_001.json")
 AlterBrowser.load("profile_001.json").launch()
 ```
+
+**Shorthand 支持的写法**（大小写和空白不敏感）：
+
+| 字段 | 示例 |
+|------|------|
+| `gpu` | `"RTX 5090"` / `"RX 7900 XTX"` / `"Arc A770"` / `"UHD 630"` / `"M2 Pro"` / 任意自由字符串 |
+| `cpu` | `"i9-14900K"` / `"Ryzen 9 7950X"` / `"M3 Max"` |
+| `os` | `"win11"` / `"Windows 10"` / `"macos 14"` / `"Sonoma"` / `"Ubuntu"` |
+| `resolution` | `"1920x1080"` / `"4K"` / `"qhd"` / `"1440p"` |
+| `city` | `"Shanghai"` / `"NYC"` / `"Tokyo"` / `"Hong Kong"` / `"London"` / 30+ 大城市 |
+
+不在预设表的显卡名会按**品牌关键词**识别（nvidia/radeon/intel/apple），其他字段 fallback 为 no-op。用户显式设置的底层字段始终优先于 shorthand。
 
 更多场景示例见 [`docs/USAGE.md`](docs/USAGE.md)，所有 API 细节见 [`docs/API.md`](docs/API.md)。
 
@@ -128,6 +146,8 @@ pytest tests/ -v
 
 ## 版本
 
+- **v0.3.0** — Shorthand 简写字段（GPU / CPU / OS / Resolution / City 一行搞定）
+- **v0.2.1** — Archetype_library 内嵌打包（`from_archetype` 可直接用）
 - **v0.2.0** — Archetype + IP 自适应 + 多模式引擎（首个 PyPI 发布）
 - **v0.1.0** — MVP（Profile + SwitchBuilder + Launcher + CLI + 测试）
 

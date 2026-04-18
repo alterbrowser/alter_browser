@@ -36,6 +36,35 @@ AlterBrowser(seed=12345).launch("https://example.com")
 
 ---
 
+## 1.5 Shorthand 简写字段（v0.3+）
+
+不想查 `gpu_renderer` 的完整 ANGLE 字符串？直接这样：
+
+```python
+AlterBrowser(
+    seed=12345,
+    gpu="RTX 5090",          # 或 "M2 Pro" / "RX 7900 XTX" / "Arc A770" / 任意自由字符串
+    cpu="i9-14900K",         # 或 "Ryzen 9 7950X" / "M3 Max"
+    os="win11",              # 或 "Windows 10" / "macos 14" / "Sonoma" / "Ubuntu"
+    resolution="4K",         # 或 "1920x1080" / "qhd" / "1440p"
+    city="Shanghai",         # 或 "NYC" / "Tokyo" / "Hong Kong" / "London"
+).launch()
+```
+
+会自动展开成底层字段：
+- `gpu="RTX 5090"` → `gpu_vendor="Google Inc. (NVIDIA)"`, `gpu_renderer="ANGLE (NVIDIA, NVIDIA GeForce RTX 5090 ...)"`, `gpu_mode=CUSTOM`
+- `cpu="i9-14900K"` → `hardware_concurrency=32`, `device_memory=32`, `cpu_mode/ram_mode=CUSTOM`
+- `os="win11"` → `platform="Win32"`, `platform_version="15.0.0"`
+- `resolution="4K"` → `screen_width=3840`, `screen_height=2160`
+- `city="Shanghai"` → `timezone="Asia/Shanghai"`, `geolocation=(31.23, 121.47, 100)`, `language="zh-CN"`
+
+**规则**：
+- shorthand 只填充"未显式设置"的底层字段（等于 dataclass 默认值视为未设置）
+- 用户显式给的底层字段始终优先，例如 `AlterBrowser(os="win11", platform="MacIntel")` 的 `platform` 会保持 `MacIntel`
+- 不在预设表的 GPU 名会按品牌关键词（`nvidia/radeon/intel/apple`）识别；CPU/OS/resolution/city 对未知值 fallback 为 no-op
+
+---
+
 ## 2. 自定义硬件指纹
 
 ```python
