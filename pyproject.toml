@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alterbrowser"
-version = "0.3.2"
+version = "1.0.0"
 description = "Python launcher & profile manager for stealth Chromium fingerprint spoofing"
 readme = "README.md"
 license = "MIT"
@@ -21,8 +21,9 @@ keywords = [
     "anti-detect",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "Typing :: Typed",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS :: MacOS X",
@@ -58,6 +59,9 @@ alterbrowser = "alterbrowser.__main__:main"
 where = ["."]
 include = ["alterbrowser*"]
 exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+alterbrowser = ["py.typed"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

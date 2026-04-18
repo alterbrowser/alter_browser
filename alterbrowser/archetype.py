@@ -67,6 +67,31 @@ def list_archetypes(
     return result
 
 
+def print_archetypes(
+    region: Optional[str] = None,
+    form_factor: Optional[str] = None,
+    os_family: Optional[str] = None,
+) -> str:
+    """
+    返回人类可读的 archetype 列表字符串（适合 CLI 输出）。
+    格式：id | 权重 | OS | GPU 简称 | 推荐短名。
+    """
+    archs = list_archetypes(region=region, form_factor=form_factor, os_family=os_family)
+    if not archs:
+        return "(no archetype matches the filter)"
+    lines = [f"{'id':<42} {'weight':>6}  {'os':<12}  gpu"]
+    lines.append("-" * 100)
+    for a in archs:
+        gpu_short = a.gpu_renderer_template.split(",")[1].strip() if "," in a.gpu_renderer_template else a.gpu_renderer_template
+        gpu_short = gpu_short[:40]
+        lines.append(f"{a.id:<42} {a.market_share_weight:>6}  {a.os_family:<12}  {gpu_short}")
+    lines.append("")
+    lines.append("Usage:")
+    lines.append("  AlterBrowser(archetype='<id or any substring>').launch()")
+    lines.append("  AlterBrowser(archetype='random').launch()")
+    return "\n".join(lines)
+
+
 def random_archetype(
     seed: int,
     region: Optional[str] = None,

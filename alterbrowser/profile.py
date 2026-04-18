@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,11 +24,79 @@ from .modes import FingerprintMode, SourceMode, WebRTCMode, TriState
 from .utils import safe_filename
 
 
-DEFAULT_CHROME_BINARY = os.environ.get(
-    "ALTERBROWSER_CHROME_BINARY",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "build", "src", "out", "Default", "chrome.exe"),
-)
+def _script_directory() -> str:
+    """推测用户入口脚本所在目录。交互式 / -c 场景兜底到 CWD。"""
+    try:
+        argv0 = sys.argv[0] if sys.argv else ""
+        if argv0 and os.path.isfile(argv0):
+            return os.path.dirname(os.path.abspath(argv0))
+    except Exception:
+        pass
+    return os.getcwd()
+
+
+def _detect_chrome_binary() -> str:
+    """
+    探测 **patch 过的** stealth Chromium 路径。
+
+    重要：alterbrowser 需要 patch 过的 Chromium（带 ``--fingerprint`` 等开关），
+    不能用普通 Google Chrome / Edge；它们不认这些开关，所有指纹伪装会静默失效。
+
+    约定的探测顺序（从高到低优先级）：
+        1. 环境变量 ALTERBROWSER_CHROME_BINARY
+        2. **用户脚本同目录** ./chrome.exe（最推荐 —— 脚本和 chrome 放一起即可）
+        3. **用户脚本同目录** ./chrome/chrome.exe （子目录版）
+        4. 当前工作目录 ./chrome.exe / ./chrome/chrome.exe
+        5. 开发者本地 build 输出 <pkg_parent>/build/src/out/Default/chrome.exe
+        6. ~/.alterbrowser/chrome/chrome.exe （约定分发位置）
+
+    找不到时返回占位路径，launch 时会报带引导的错。
+    """
+    # 1. 显式环境变量
+    env = os.environ.get("ALTERBROWSER_CHROME_BINARY")
+    if env:
+        return env
+
+    exe_name = "chrome.exe" if os.name == "nt" else "chrome"
+
+    # 2-3. 脚本同目录
+    script_dir = _script_directory()
+    for candidate in (
+        os.path.join(script_dir, exe_name),
+        os.path.join(script_dir, "chrome", exe_name),
+    ):
+        if os.path.isfile(candidate):
+            return candidate
+
+    # 4. 当前工作目录（可能与脚本目录不同）
+    cwd = os.getcwd()
+    if cwd != script_dir:
+        for candidate in (
+            os.path.join(cwd, exe_name),
+            os.path.join(cwd, "chrome", exe_name),
+        ):
+            if os.path.isfile(candidate):
+                return candidate
+
+    # 5. 开发者本地 build 输出
+    pkg_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    local_build = os.path.join(pkg_parent, "build", "src", "out", "Default", exe_name)
+    if os.path.isfile(local_build):
+        return local_build
+
+    # 6. ~/.alterbrowser/chrome/
+    home_dist = os.path.expanduser(os.path.join("~", ".alterbrowser", "chrome", exe_name))
+    if os.path.isfile(home_dist):
+        return home_dist
+
+    # 找不到 — 返回脚本目录下的 chrome.exe 占位，launch 时报友好错误
+    return os.path.join(script_dir, exe_name)
+
+
+# 注：DEFAULT_CHROME_BINARY 作为"建议默认值"仅在 import 时算一次；
+# 真正运行时由 Profile.__post_init__ 调用 _detect_chrome_binary() 重新解析，
+# 这样 sys.argv[0] 能反映用户入口脚本的真实路径。
+DEFAULT_CHROME_BINARY = _detect_chrome_binary()
 
 DEFAULT_PROFILES_BASE = os.environ.get(
     "ALTERBROWSER_PROFILES_DIR",
@@ -140,6 +209,7 @@ class Profile:
     os: Optional[str] = None            # "win11" / "macos 14" / "linux"
     resolution: Optional[str] = None    # "1920x1080" / "4K" / "qhd"
     city: Optional[str] = None          # "Shanghai" / "New York" / "Tokyo"
+    mobile: Any = None                  # True=android / "android" / "ios"
 
     # ============================================
     # 校验 & 序列化
@@ -150,6 +220,10 @@ class Profile:
         if self.seed is None:
             from .utils import random_seed
             self.seed = random_seed()
+        # chrome_binary 运行时再解析一次（用户没显式传才重算），
+        # 这样 sys.argv[0] 能反映真实脚本路径
+        if self.chrome_binary == DEFAULT_CHROME_BINARY:
+            self.chrome_binary = _detect_chrome_binary()
         # 先展开 shorthand 简写字段（gpu / cpu / os / resolution / city）
         self._expand_shorthand()
         # 规范化所有枚举字段（接受字符串输入）
@@ -187,10 +261,13 @@ class Profile:
                 f"device_memory must be one of {_VALID_DEVICE_MEMORY}, got {self.device_memory}"
             )
 
-        if self.screen_width is not None and not (640 <= self.screen_width <= 7680):
-            raise ProfileValidationError("screen_width out of range")
-        if self.screen_height is not None and not (480 <= self.screen_height <= 4320):
-            raise ProfileValidationError("screen_height out of range")
+        # 下限放宽支持移动端 (iPhone SE 宽度 320)
+        if self.screen_width is not None and not (320 <= self.screen_width <= 7680):
+            raise ProfileValidationError(
+                f"screen_width must be 320..7680, got {self.screen_width}")
+        if self.screen_height is not None and not (400 <= self.screen_height <= 4320):
+            raise ProfileValidationError(
+                f"screen_height must be 400..4320, got {self.screen_height}")
 
         if self.battery_level is not None and not (0.0 <= self.battery_level <= 1.0):
             raise ProfileValidationError("battery_level must be 0.0..1.0")
@@ -216,6 +293,7 @@ class Profile:
             os=self.os,
             resolution=self.resolution,
             city=self.city,
+            mobile=self.mobile,
         )
         if not expanded:
             return
@@ -363,3 +441,36 @@ class ProfileBatch:
         for p in self.profiles:
             nm = safe_filename(p.name) if p.name else f"seed_{p.seed}"
             p.save(os.path.join(directory, f"{nm}.json"))
+
+    def launch_all(
+        self,
+        url: Optional[str] = None,
+        stagger_seconds: float = 0.5,
+    ) -> List[Any]:
+        """
+        并发启动所有 profile。
+
+        Args:
+            url: 覆盖每个 profile 的 start_url
+            stagger_seconds: 每次启动之间的间隔秒数（避免同时写同一个磁盘位置）
+
+        Returns:
+            subprocess.Popen 列表（和 profiles 顺序对应）
+        """
+        import time
+        from .launcher import launch_profile
+        procs = []
+        for i, p in enumerate(self.profiles):
+            if i > 0 and stagger_seconds > 0:
+                time.sleep(stagger_seconds)
+            procs.append(launch_profile(p, override_url=url))
+        return procs
+
+    def summary(self) -> str:
+        """返回批量信息的简要字符串表示（调试用）"""
+        lines = [f"ProfileBatch ({len(self.profiles)} profiles)"]
+        for p in self.profiles:
+            tag = p.name or f"seed_{p.seed}"
+            arch = f" [archetype={p.archetype_id}]" if p.archetype_id else ""
+            lines.append(f"  - {tag}: platform={p.platform} seed={p.seed}{arch}")
+        return "\n".join(lines)

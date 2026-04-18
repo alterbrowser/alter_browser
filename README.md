@@ -32,22 +32,47 @@
 
 ## 安装
 
-暂不发 PyPI。两种用法：
+### 1. 装 Python 库
 
 ```bash
-# 方式一：加入 PYTHONPATH
-git clone <this-repo> alterbrowser
-python -c "import alterbrowser; print(alterbrowser.__version__)"
-
-# 方式二：editable install（需要 Python ≥ 3.9）
-pip install -e ./alterbrowser
+pip install alterbrowser
 ```
 
-配置 chrome 路径（可选，否则用打包默认值）：
+### 2. 准备 **patch 过的 Chromium**（必需）
+
+本库需要 patch 过的 stealth Chromium（带 `--fingerprint` 等开关），**不能用普通 Google Chrome**，否则指纹伪装会静默失效。
+
+参考 [致谢章节](#致谢-credits) 中的两个上游项目自行编译，得到 `chrome.exe`。
+
+### 3. 把 `chrome.exe` 放到你脚本旁边（推荐）
+
+```
+my-project/
+├── run.py              <- 你的脚本
+└── chrome.exe          <- patch 过的 Chromium，直接放这
+```
+
+然后：
+
+```python
+from alterbrowser import AlterBrowser
+AlterBrowser().launch("https://example.com")    # 自动找同目录 chrome.exe
+```
+
+**其他 chrome 路径方案**（按优先级）：
+
+| 优先级 | 方式 | 适用场景 |
+|------|------|---------|
+| 1 | 环境变量 `ALTERBROWSER_CHROME_BINARY` | 多脚本共享 |
+| 2 | 脚本同目录 `./chrome.exe` | **最推荐** |
+| 3 | 脚本子目录 `./chrome/chrome.exe` | 想隔离 |
+| 4 | `~/.alterbrowser/chrome/chrome.exe` | 用户级安装 |
+| 5 | 构造时显式传 `AlterBrowser(chrome_binary='...')` | 临时覆盖 |
+
+跑 `alterbrowser doctor` 验证装好了：
 
 ```bash
-export ALTERBROWSER_CHROME_BINARY="/path/to/your/patched-chrome"
-export ALTERBROWSER_PROFILES_DIR="/path/to/profiles"
+alterbrowser doctor
 ```
 
 ---
@@ -151,7 +176,38 @@ alter_browser/                 ← repo 根
 
 ---
 
-## 运行测试
+## CLI 命令
+
+```bash
+alterbrowser doctor                          # 诊断环境
+alterbrowser archetypes                      # 列出所有机型
+alterbrowser cities                          # 列出 city shorthand
+alterbrowser launch https://example.com      # 启动（seed 自动生成）
+alterbrowser launch --profile my.json
+alterbrowser fonts --mode mix                # 生成字体列表
+alterbrowser info --profile my.json          # 查看 profile 详情
+alterbrowser kill                            # 杀掉所有 chrome
+```
+
+---
+
+## 故障排查
+
+### `BinaryNotFoundError: Patched Chromium not found`
+
+跑 `alterbrowser doctor` 看探测路径。最简单的修复：**把 patch 过的 `chrome.exe` 放到你 `.py` 脚本旁边**。
+
+### `doctor` 报 `--help 输出未包含 --fingerprint 开关`
+
+说明这个 chrome 可能是普通 Google Chrome 而非 patch 过的版本。指纹功能会静默失效。换成 patch 版。
+
+### 测试 IP 指纹后仍被检测
+
+1. 跑 `doctor` 确认 patch 能力全部 OK。
+2. 检查 `fingerprint_mode`：默认 `REALISTIC`（推荐），如果测试站会做"unique fingerprint"判断，可切 `UNIQUE`。
+3. 用 `sb.adapt_to_ip()` 对齐时区 / 地理 / 语言 / 字体，避免交叉校验识破。
+
+### 运行测试
 
 ```bash
 pytest tests/ -v
@@ -161,12 +217,7 @@ pytest tests/ -v
 
 ## 版本
 
-- **v0.3.2** — `archetype` 支持模糊匹配 + "random"；作为 kwarg 直接传入（`AlterBrowser(archetype="macbook")`）
-- **v0.3.1** — `seed` 改为完全可选；不传则用时间戳+熵自动生成
-- **v0.3.0** — Shorthand 简写字段（GPU / CPU / OS / Resolution / City 一行搞定）
-- **v0.2.1** — Archetype_library 内嵌打包（`from_archetype` 可直接用）
-- **v0.2.0** — Archetype + IP 自适应 + 多模式引擎（首个 PyPI 发布）
-- **v0.1.0** — MVP（Profile + SwitchBuilder + Launcher + CLI + 测试）
+见 [CHANGELOG.md](CHANGELOG.md)。当前：**v1.0.0** — API 稳定。
 
 ---
 

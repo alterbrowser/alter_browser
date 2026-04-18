@@ -38,7 +38,19 @@ def launch_profile(
     """
     if not os.path.isfile(profile.chrome_binary):
         raise BinaryNotFoundError(
-            f"chrome.exe not found: {profile.chrome_binary}"
+            f"Patched Chromium not found at: {profile.chrome_binary}\n"
+            f"\nalterbrowser 需要 **patch 过的 Chromium**（带 --fingerprint 等开关），\n"
+            f"不能用普通 Google Chrome —— 它不认这些开关，指纹伪装会静默失效。\n"
+            f"\n最简单的修复（三选一）：\n"
+            f"  ①  把 patch 过的 chrome.exe 放到【你的 .py 脚本同目录】—— 库会自动找到\n"
+            f"  ②  或放到子目录 ./chrome/chrome.exe\n"
+            f"  ③  或用环境变量 / 构造参数显式指定：\n"
+            f"        $env:ALTERBROWSER_CHROME_BINARY = 'D:\\path\\to\\chrome.exe'\n"
+            f"        AlterBrowser(chrome_binary='D:\\path\\to\\chrome.exe').launch()\n"
+            f"\n如何获得 patch 过的 chrome.exe：\n"
+            f"  基于 ungoogled-chromium + adryfish/fingerprint-chromium 自行编译。\n"
+            f"  见 https://github.com/alterbrowser/alter_browser 的 README 致谢章节。\n"
+            f"\n跑 `alterbrowser doctor` 可以得到更详细的诊断。"
         )
 
     cmd = build_switches(profile)

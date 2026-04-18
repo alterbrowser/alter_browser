@@ -391,6 +391,60 @@ CITY_PRESETS: Dict[str, Dict[str, Any]] = {
 }
 
 
+# ============================================================
+# Mobile 预设（一键切到移动端指纹）
+# ============================================================
+
+# 典型 Android 14 Chrome UA（可通过 user_agent 字段完全覆盖）
+_MOBILE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "android": {
+        "platform": "Linux armv81",
+        "platform_version": "14",
+        "user_agent": ("Mozilla/5.0 (Linux; Android 14; Pixel 8) "
+                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                       "Chrome/142.0.0.0 Mobile Safari/537.36"),
+        "screen_width": 412,
+        "screen_height": 915,
+        "max_touch_points": 5,
+        "hardware_concurrency": 8,
+        "device_memory": 8,
+        "cpu_mode": "custom",
+        "ram_mode": "custom",
+    },
+    "ios": {
+        "platform": "iPhone",
+        "platform_version": "17.0",
+        "user_agent": ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                       "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                       "Version/17.0 Mobile/15E148 Safari/604.1"),
+        "screen_width": 390,
+        "screen_height": 844,
+        "max_touch_points": 5,
+        "hardware_concurrency": 6,
+        "device_memory": 8,     # iOS 通常上报 4 或 8 (W3C 枚举)
+        "cpu_mode": "custom",
+        "ram_mode": "custom",
+    },
+}
+
+
+def resolve_mobile(value: Any) -> Dict[str, Any]:
+    """
+    把 mobile 简写展开到移动端字段。
+
+    >>> resolve_mobile(True)        # Android（默认）
+    >>> resolve_mobile("android")
+    >>> resolve_mobile("ios")
+    """
+    if not value:
+        return {}
+    if value is True:
+        key = "android"
+    else:
+        key = _normalize(str(value))
+    return dict(_MOBILE_PRESETS.get(key, {}))
+
+
 def resolve_city(name: str) -> Dict[str, Any]:
     """
     >>> resolve_city("Shanghai")
@@ -420,13 +474,16 @@ def expand_shorthand(
     os: Optional[str] = None,
     resolution: Optional[str] = None,
     city: Optional[str] = None,
+    mobile: Any = None,
 ) -> Dict[str, Any]:
     """
     把所有简写字段一次性展开成 Profile 字段字典。
-    顺序：城市优先（因为可能含 language），其次 OS / CPU / GPU / resolution。
-    后填的不会覆盖前面明确的字段。
+    顺序：mobile 最先（设置移动端基底），然后 city / os / cpu / gpu / resolution
+    依次覆盖。后填的不会覆盖前面已经明确给出的字段。
     """
     out: Dict[str, Any] = {}
+    if mobile:
+        out.update(resolve_mobile(mobile))
     if city:
         out.update(resolve_city(city))
     if os:
