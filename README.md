@@ -54,33 +54,44 @@ export ALTERBROWSER_PROFILES_DIR="/path/to/profiles"
 
 ## 5 分钟上手
 
+**核心思路：任何配置都直接传参数，不需要查 API 手册或记 ID。**
+
 ```python
 from alterbrowser import AlterBrowser
 
-# 1) 最简：什么都不填，seed 自动用时间戳+熵生成
+# 1) 最简 — 什么都不填
 AlterBrowser().launch("https://example.com")
 
-# 2) 🔥 shorthand：一行指定 GPU / CPU / OS / 分辨率 / 城市（v0.3+）
+# 2) 🔥 直接传你想要的配置（shorthand 自动展开）
 AlterBrowser(
-    gpu="RTX 5090",        # 自动展开成 gpu_vendor/gpu_renderer
-    cpu="i9-14900K",       # 自动展开成 hardware_concurrency / device_memory
-    os="win11",            # 自动展开成 platform / platform_version
-    resolution="4K",       # 自动展开成 screen_width/height（也支持 "1920x1080"）
-    city="Shanghai",       # 自动展开成 timezone / geolocation / language
+    gpu="RTX 5090",        # → gpu_vendor + gpu_renderer
+    cpu="i9-14900K",       # → hardware_concurrency + device_memory
+    os="win11",            # → platform + platform_version
+    resolution="4K",       # → screen_width / height  (也支持 "1920x1080")
+    city="Shanghai",       # → timezone + geolocation + language
+    proxy="http://user:pass@host:8080",
+    fonts_mode="mix",
 ).launch("https://example.com")
 
-# 3) 想要可复现？显式传 seed
-AlterBrowser(seed=12345, city="Shanghai").launch()
+# 3) 想偷懒？用真实机型模板打底（可选）
+AlterBrowser(archetype="macbook").launch()              # 模糊匹配
+AlterBrowser(archetype="dell", city="NYC").launch()     # archetype 打底 + 自由覆盖
+AlterBrowser(archetype="random", gpu="RTX 4090").launch()  # 随机机型 + 覆盖 GPU
 
-# 4) 从 Device Archetype 派生（市场权重随机挑一个真实机型）
-sb = AlterBrowser.from_archetype("dell_latitude_e6430_2012")
-sb.adapt_to_ip()           # 按出口 IP 自动对齐时区/地理/语言/字体
-sb.launch("https://example.com")
+# 4) 想可复现？显式传 seed
+AlterBrowser(seed=12345, city="Shanghai").launch()
 
 # 5) 持久化
 sb.save("profile_001.json")
 AlterBrowser.load("profile_001.json").launch()
 ```
+
+**设计原则**：任何字段都可以直接作为 kwarg 传入 `AlterBrowser(...)`：
+- 底层字段：`platform` / `gpu_vendor` / `timezone` / `proxy` / `user_agent` / `extra_args` / ... 总 40+
+- Shorthand 便捷字段：`gpu` / `cpu` / `os` / `resolution` / `city`
+- 懒人模板：`archetype="<任意关键词>"`（模糊匹配真实机型）
+
+**用户显式给的字段永远优先**，不会被 shorthand 或 archetype 覆盖。
 
 **Shorthand 支持的写法**（大小写和空白不敏感）：
 
@@ -150,6 +161,7 @@ pytest tests/ -v
 
 ## 版本
 
+- **v0.3.2** — `archetype` 支持模糊匹配 + "random"；作为 kwarg 直接传入（`AlterBrowser(archetype="macbook")`）
 - **v0.3.1** — `seed` 改为完全可选；不传则用时间戳+熵自动生成
 - **v0.3.0** — Shorthand 简写字段（GPU / CPU / OS / Resolution / City 一行搞定）
 - **v0.2.1** — Archetype_library 内嵌打包（`from_archetype` 可直接用）

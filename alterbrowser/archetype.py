@@ -105,6 +105,59 @@ def find_archetype_by_hint(gpu_hint: str = "", os_hint: str = "",
     return best
 
 
+def find_archetype_smart(name: str, seed: Optional[int] = None) -> Optional[str]:
+    """
+    模糊匹配 archetype id，用户友好。
+
+    支持：
+    - 精确 id:  "dell_latitude_e6430_2012"
+    - 短名:    "dell" / "thinkpad" / "macbook air" / "surface"
+    - 特殊:    "random" → 按市场权重随机挑一个
+
+    匹配优先级（高 → 低）：
+    1. 精确 id 匹配
+    2. 规范化后子串匹配 archetype_id（按市场权重排序）
+    3. GPU renderer / OS 字段包含
+
+    >>> find_archetype_smart("dell")
+    'dell_latitude_e6430_2012'  # or 'desktop_dell_optiplex_7020_2015'
+    >>> find_archetype_smart("macbook air")
+    'macbook_air_m2_2022'
+    >>> find_archetype_smart("random")  # 随机一个
+    """
+    if not ARCHETYPES_AVAILABLE or not ARCHETYPES:
+        return None
+    if not name:
+        return None
+    name = name.strip()
+
+    # 特殊关键字
+    if name.lower() == "random":
+        import random as _random
+        rng = _random.Random(seed) if seed else _random
+        weights = [max(1, a.market_share_weight) for a in ARCHETYPES.values()]
+        return rng.choices(list(ARCHETYPES.keys()), weights=weights, k=1)[0]
+
+    key = name.lower().replace(" ", "_").replace("-", "_")
+
+    # 精确匹配
+    if key in ARCHETYPES:
+        return key
+
+    # 子串匹配 archetype_id —— 按市场权重排序，返回权重最高的
+    candidates = [(k, a) for k, a in ARCHETYPES.items() if key in k]
+    if candidates:
+        candidates.sort(key=lambda x: -x[1].market_share_weight)
+        return candidates[0][0]
+
+    # fallback: GPU renderer / OS 字段包含
+    for k, a in ARCHETYPES.items():
+        if (key in a.gpu_renderer_template.lower()
+                or key in a.os_display_version.lower().replace(" ", "_")):
+            return k
+    return None
+
+
 # ============================================================
 # ArchetypeProfileBuilder —— Archetype -> Profile 转换
 # ============================================================

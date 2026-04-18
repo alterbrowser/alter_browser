@@ -35,8 +35,39 @@ class AlterBrowser:
     >>> sb = AlterBrowser.load("profile.json")
     """
 
-    def __init__(self, **kwargs):
-        # 把 kwargs 整理成 Profile 字段
+    def __init__(self, archetype: Optional[str] = None, **kwargs):
+        """
+        构造 AlterBrowser。
+
+        Args:
+            archetype: 可选，支持 archetype id / 短名（"dell" / "macbook"）/
+                       "random"（按市场权重随机）。传了就用该 archetype 打底，
+                       其他 kwargs 覆盖 archetype 字段。
+            **kwargs: 任意 Profile 字段 + shorthand（gpu/cpu/os/resolution/city）。
+
+        Examples:
+            >>> AlterBrowser().launch()                             # 100% 默认
+            >>> AlterBrowser(city="Shanghai").launch()              # 只改城市
+            >>> AlterBrowser(gpu="RTX 5090", cpu="i9-14900K").launch()  # shorthand
+            >>> AlterBrowser(archetype="macbook").launch()          # 懒人模式
+            >>> AlterBrowser(archetype="random", city="NYC").launch()   # 随机 + 覆盖
+        """
+        if archetype is not None:
+            from .archetype import find_archetype_smart, build_profile_from_archetype, ARCHETYPES
+            from .utils import random_seed
+            arch_id = find_archetype_smart(archetype)
+            if arch_id is None:
+                available = sorted(ARCHETYPES.keys())[:5]
+                raise ValueError(
+                    f"archetype={archetype!r} 匹配不到任何机型。"
+                    f"试试 'dell' / 'thinkpad' / 'macbook' / 'surface' / 'random'。"
+                    f"完整列表前 5 个: {available}"
+                )
+            seed = kwargs.pop("seed", None) or random_seed()
+            arch_kwargs = build_profile_from_archetype(arch_id, seed=seed)
+            arch_kwargs.update(kwargs)  # 用户 kwargs 覆盖 archetype
+            kwargs = arch_kwargs
+
         self.profile = Profile.from_dict(kwargs) if kwargs else Profile()
 
     # --------------------------------------------
