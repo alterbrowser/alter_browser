@@ -1,0 +1,1 @@
+"""alterbrowser test suite."""
